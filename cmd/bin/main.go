@@ -18,11 +18,16 @@ func main() {
 	var urls []url.URL
 
 	subs := map[string][]byte{
-		"real.okex.com:8443": []byte(`{"op":"subscribe", "args": ["spot/depth5:ETH-USDT"]}`)}
+		"real.okex.com:8443": []byte(`{"op":"subscribe", "args": ["spot/depth5:ETH-USDT"]}`),
+		"api.huobi.pro":      []byte(`{"sub": "market.btcusdt.depth.step0"}`),
+		"dex.binance.org":    []byte(`{"method": "SUBSCRIBE", "params": ["btcusdt@depth"], "id": 1`),
+		"www.bitmex.com":     []byte(`{"op": "subscribe", "args": ["orderBookL2:ETHUSD"]}`)}
 
 	urls = append(urls,
-		url.URL{Scheme: "wss", Host: "real.okex.com:8443", Path: "/ws/v3", RawQuery: "compress=true"},
-		url.URL{Scheme: "wss", Host: "api.huobi.pro", Path: "ws"})
+		// url.URL{Scheme: "wss", Host: "real.okex.com:8443", Path: "/ws/v3", RawQuery: "compress=true"},
+		// url.URL{Scheme: "wss", Host: "api.huobi.pro", Path: "ws"},
+		// url.URL{Scheme: "wss", Host: "www.bitmex.com", Path: "realtime"},
+		url.URL{Scheme: "wss", Host: "stream.binance.com:9443", Path: "/ws/bnbusdt@depth20@100ms"})
 
 	// for graceful shutdown
 	shutdown := make(chan struct{})
@@ -98,6 +103,5 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, wg *sync.WaitGroup) {
 func gzip(in []byte) ([]byte, error) {
 	reader := flate.NewReader(bytes.NewReader(in))
 	defer reader.Close()
-
 	return ioutil.ReadAll(reader)
 }
