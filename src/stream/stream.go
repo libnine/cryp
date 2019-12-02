@@ -22,6 +22,12 @@ type Depth struct {
 	depthOkex    interface{}
 }
 
+type binance struct {
+	LastUpdateID int32       `json:"lastUpdateId"`
+	Bids         [][]float64 `json:"bids"`
+	Asks         [][]float64 `json:"asks"`
+}
+
 type bitmex struct {
 	Table  string     `json:"table"`
 	Action string     `json:"action"`
@@ -45,16 +51,6 @@ type okexl2 struct {
 	Bids [][]json.Number `json:"bids"`
 	Inst string          `json:"instrument_id"`
 	Ts   *time.Time      `json:"timestamp"`
-}
-
-type binance struct {
-	Etype         string      `json:"e"`
-	Etime         *time.Time  `json:"E"`
-	Symbol        string      `json:"s"`
-	FirstUpdateID int64       `json:"U"`
-	FinalUpdateID int64       `json:"u"`
-	Bids          [][]float64 `json:"b"`
-	Asks          [][]float64 `json:"a"`
 }
 
 func Stream() {
@@ -120,8 +116,8 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, l *Depth, wg *sync.WaitG
 				} else if u.Host == "stream.binance.com:9443" {
 					var x binance
 					_ = json.Unmarshal(message, &x)
-					// l.depthBinance = x
-					log.Println(x)
+					l.depthBinance = x
+					log.Printf("%v", l)
 				} else if u.Host == "www.bitmex.com" {
 					var x bitmex
 					_ = json.Unmarshal(message, &x)
