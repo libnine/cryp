@@ -69,9 +69,9 @@ func Stream() {
 		"www.bitmex.com":          []byte(`{"op": "subscribe", "args": ["orderBookL2:ETHUSD"]}`)}
 
 	urls = append(urls,
-		url.URL{Scheme: "wss", Host: "real.okex.com:8443", Path: "/ws/v3", RawQuery: "compress=true"},
+		// url.URL{Scheme: "wss", Host: "real.okex.com:8443", Path: "/ws/v3", RawQuery: "compress=true"},
 		// url.URL{Scheme: "wss", Host: "api.huobi.pro", Path: "ws"},
-		url.URL{Scheme: "wss", Host: "www.bitmex.com", Path: "realtime"},
+		// url.URL{Scheme: "wss", Host: "www.bitmex.com", Path: "realtime"},
 		url.URL{Scheme: "wss", Host: "stream.binance.com:9443", Path: "/ws/ethusdt@depth20"})
 
 	// for graceful shutdown
@@ -115,17 +115,19 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, l *Depth, wg *sync.WaitG
 				if u.Host == "real.okex.com:8443" {
 					var x okex
 					_ = json.Unmarshal(message, &x)
-					l.depthOkex = x
+					// l.depthOkex = x
+					log.Println(x)
 				} else if u.Host == "stream.binance.com:9443" {
 					var x binance
 					_ = json.Unmarshal(message, &x)
-					l.depthBinance = x
+					// l.depthBinance = x
+					log.Println(x)
 				} else if u.Host == "www.bitmex.com" {
 					var x bitmex
 					_ = json.Unmarshal(message, &x)
-					l.depthOkex = x
+					// l.depthOkex = x
+					log.Println(x)
 				}
-				log.Println(l)
 			case websocket.BinaryMessage:
 				text, err := gzip(message)
 				if err != nil {
