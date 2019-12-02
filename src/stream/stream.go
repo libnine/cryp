@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/flate"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -23,14 +24,14 @@ type Depth struct {
 }
 
 type binance struct {
-	LastUpdateID int32       `json:"lastUpdateId"`
-	Bids         [][]float64 `json:"bids"`
-	Asks         [][]float64 `json:"asks"`
+	LastUpdateID int32           `json:"lastUpdateId"`
+	Bids         [][]json.Number `json:"bids"`
+	Asks         [][]json.Number `json:"asks"`
 }
 
 type bitmex struct {
 	Table  string     `json:"table"`
-	Action string     `json:"action"`
+	Action string     `json:"action,omitempty"`
 	Data   []bitmexl2 `json:"data"`
 }
 
@@ -62,13 +63,13 @@ func Stream() {
 		"real.okex.com:8443":      []byte(`{"op":"subscribe", "args": ["spot/depth5:ETH-USDT"]}`),
 		"api.huobi.pro":           []byte(`{"sub": "market.btcusdt.depth.step0"}`),
 		"stream.binance.com:9443": []byte(`{"method": "SUBSCRIBE", "params": ["ethusdt@depth"], "id": 1}`),
-		"www.bitmex.com":          []byte(`{"op": "subscribe", "args": ["orderBookL2:ETHUSD"]}`)}
+		"www.bitmex.com":          []byte(`{"op": "subscribe", "args": ["orderBookL2_25:ETHUSD"]}`)}
 
 	urls = append(urls,
 		// url.URL{Scheme: "wss", Host: "real.okex.com:8443", Path: "/ws/v3", RawQuery: "compress=true"},
 		// url.URL{Scheme: "wss", Host: "api.huobi.pro", Path: "ws"},
-		// url.URL{Scheme: "wss", Host: "www.bitmex.com", Path: "realtime"},
-		url.URL{Scheme: "wss", Host: "stream.binance.com:9443", Path: "/ws/ethusdt@depth20"})
+		url.URL{Scheme: "wss", Host: "www.bitmex.com", Path: "realtime?subscribe=instrument"})
+	// url.URL{Scheme: "wss", Host: "stream.binance.com:9443", Path: "/ws/ethusdt@depth20"})
 
 	// for graceful shutdown
 	shutdown := make(chan struct{})
@@ -116,13 +117,16 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, l *Depth, wg *sync.WaitG
 				} else if u.Host == "stream.binance.com:9443" {
 					var x binance
 					_ = json.Unmarshal(message, &x)
-					l.depthBinance = x
+					if x.Bids == nil || x.Asks == nil {
+						continue
+					}
+					l.depthBinance = fmt.Sprintf("%v %v", x.Bids, x.Asks)
 					log.Printf("%v", l)
 				} else if u.Host == "www.bitmex.com" {
 					var x bitmex
 					_ = json.Unmarshal(message, &x)
 					// l.depthOkex = x
-					log.Println(x)
+					log.Printf("%s", message)
 				}
 			case websocket.BinaryMessage:
 				text, err := gzip(message)
