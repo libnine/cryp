@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/flate"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -16,33 +15,42 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Depth of all combined exchanges data
-type Depth struct {
-	depthBinance interface{}
-	depthBitmex  interface{}
-	depthOkex    interface{}
-}
-
 type binance struct {
-	LastUpdateID int32           `json:"lastUpdateId"`
+	Host         string          `json:"host,omitempty"`
+	LastUpdateID int             `json:"lastUpdateId"`
 	Bids         [][]json.Number `json:"bids"`
 	Asks         [][]json.Number `json:"asks"`
 }
 
 type bitmex struct {
+	Host   string     `json:"host,omitempty"`
 	Table  string     `json:"table"`
 	Action string     `json:"action,omitempty"`
 	Data   []bitmexl2 `json:"data"`
 }
 
 type bitmexl2 struct {
-	Symbol string `json:"symbol"`
-	ID     int64  `json:"id"`
-	Side   string `json:"side"`
-	Size   int64  `json:"size"`
+	Symbol string  `json:"symbol"`
+	ID     int64   `json:"id"`
+	Price  float64 `json:"price,omitempty"`
+	Side   string  `json:"side"`
+	Size   int64   `json:"size"`
+}
+
+type bitmexInit struct {
+	ready       bool
+	Table       string          `json:"table"`
+	Action      string          `json:"action"`
+	Keys        []string        `json:"keys"`
+	Types       json.RawMessage `json:"types,omitempty"`
+	ForeignKeys json.RawMessage `json:"foreignKeys,omitempty"`
+	Attributes  json.RawMessage `json:"attributes,omitempty"`
+	Filter      json.RawMessage `json:"filter,omitempty"`
+	Data        json.RawMessage `json:"data"`
 }
 
 type okex struct {
+	Host  string   `json:"host,omitempty"`
 	Table string   `json:"table"`
 	Data  []okexl2 `json:"data"`
 }
@@ -54,28 +62,36 @@ type okexl2 struct {
 	Ts   *time.Time      `json:"timestamp"`
 }
 
-func Stream() {
-	var l2 Depth
-	var wg sync.WaitGroup
-	var urls []url.URL
+// global variables
+var (
+	BitmexTable     = bitmexInit{}
+	IncomingOkex    = make(chan okex)
+	IncomingBinance = make(chan binance)
+	IncomingBitmex  = make(chan bitmex)
+)
+
+// Stream for crypto data
+func Stream(wg *sync.WaitGroup) {
+	var (
+		interrupt = make(chan os.Signal, 1)
+		shutdown  = make(chan struct{})
+		urls      []url.URL
+	)
 
 	subs := map[string][]byte{
+		// "api.huobi.pro":           []byte(`{"sub": "market.btcusdt.depth.step0"}`),
 		"real.okex.com:8443":      []byte(`{"op":"subscribe", "args": ["spot/depth5:ETH-USDT"]}`),
-		"api.huobi.pro":           []byte(`{"sub": "market.btcusdt.depth.step0"}`),
 		"stream.binance.com:9443": []byte(`{"method": "SUBSCRIBE", "params": ["ethusdt@depth"], "id": 1}`),
 		"www.bitmex.com":          []byte(`{"op": "subscribe", "args": ["orderBookL2_25:ETHUSD"]}`)}
 
 	urls = append(urls,
-		// url.URL{Scheme: "wss", Host: "real.okex.com:8443", Path: "/ws/v3", RawQuery: "compress=true"},
 		// url.URL{Scheme: "wss", Host: "api.huobi.pro", Path: "ws"},
-		url.URL{Scheme: "wss", Host: "www.bitmex.com", Path: "realtime?subscribe=instrument"})
-	// url.URL{Scheme: "wss", Host: "stream.binance.com:9443", Path: "/ws/ethusdt@depth20"})
+		url.URL{Scheme: "wss", Host: "real.okex.com:8443", Path: "/ws/v3", RawQuery: "compress=true"},
+		url.URL{Scheme: "wss", Host: "www.bitmex.com", Path: "realtime?subscribe=instrument"},
+		url.URL{Scheme: "wss", Host: "stream.binance.com:9443", Path: "/ws/ethusdt@depth20"})
 
 	// for graceful shutdown
-	shutdown := make(chan struct{})
-	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
-
 	go func() {
 		<-interrupt
 		log.Println("Interrupt.")
@@ -84,13 +100,13 @@ func Stream() {
 
 	for _, u := range urls {
 		wg.Add(1)
-		go con(u, shutdown, subs[u.Host], &l2, &wg)
+		go con(u, shutdown, subs[u.Host], wg)
 	}
 
 	wg.Wait()
 }
 
-func con(u url.URL, shutdown chan struct{}, sub []byte, l *Depth, wg *sync.WaitGroup) {
+func con(u url.URL, shutdown chan struct{}, sub []byte, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	log.Printf("connecting to %s", u.Host)
@@ -99,9 +115,12 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, l *Depth, wg *sync.WaitG
 		log.Fatal("dial:", err)
 	}
 	defer c.Close()
-
 	c.WriteMessage(websocket.TextMessage, sub)
-	done := make(chan struct{})
+
+	var (
+		attempts int = 0
+		done         = make(chan struct{})
+	)
 
 	go func() {
 		defer close(done)
@@ -109,27 +128,46 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, l *Depth, wg *sync.WaitG
 			messageType, message, err := c.ReadMessage()
 			switch messageType {
 			case websocket.TextMessage:
-				if u.Host == "real.okex.com:8443" {
+				switch u.Host {
+
+				case "real.okex.com:8443":
 					var x okex
 					_ = json.Unmarshal(message, &x)
-					// l.depthOkex = x
-					log.Println(x)
-				} else if u.Host == "stream.binance.com:9443" {
+					x.Host = "okex"
+					IncomingOkex <- x
+
+				case "stream.binance.com:9443":
 					var x binance
 					_ = json.Unmarshal(message, &x)
-					if x.Bids == nil || x.Asks == nil {
-						continue
+					x.Host = "binance"
+					IncomingBinance <- x
+
+				case "www.bitmex.com":
+					if !BitmexTable.ready {
+						attempts++
+						_ = json.Unmarshal(message, &BitmexTable)
+
+						if len(BitmexTable.Keys) > 0 {
+							BitmexTable.ready = true
+						}
+
+						if attempts >= 10 {
+							log.Fatal("Stopped bitmex after 10 attempts.")
+							return
+						}
+
+					} else {
+						var x bitmex
+						_ = json.Unmarshal(message, &x)
+						x.Host = "bitmex"
+						IncomingBitmex <- x
 					}
-					l.depthBinance = fmt.Sprintf("%v %v", x.Bids, x.Asks)
-					log.Printf("%v", l)
-				} else if u.Host == "www.bitmex.com" {
-					var x bitmex
-					_ = json.Unmarshal(message, &x)
-					// l.depthOkex = x
-					log.Printf("%s", message)
 				}
+
 			case websocket.BinaryMessage:
-				text, err := gzip(message)
+				reader := flate.NewReader(bytes.NewReader(message))
+				defer reader.Close()
+				text, err := ioutil.ReadAll(reader)
 				if err != nil {
 					log.Printf("err: %s %s", u.Host, err)
 				}
@@ -137,8 +175,8 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, l *Depth, wg *sync.WaitG
 				if u.Host == "real.okex.com:8443" {
 					var x okex
 					_ = json.Unmarshal(text, &x)
-					l.depthOkex = x
-					log.Println(l)
+					x.Host = "okex"
+					IncomingOkex <- x
 				}
 			}
 			if err != nil {
@@ -162,11 +200,4 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, l *Depth, wg *sync.WaitG
 			return
 		}
 	}
-
-}
-
-func gzip(in []byte) ([]byte, error) {
-	reader := flate.NewReader(bytes.NewReader(in))
-	defer reader.Close()
-	return ioutil.ReadAll(reader)
 }
