@@ -1,10 +1,13 @@
 <template>
   <div class="container">
     <div class="col">
-      <h1>{{ sorted_bitmex_bids }}</h1>
+      <p>{{ sorted_bitmex_bids }}</p>
     </div>
     <div class="col">
-      <h1>{{ sorted_bitmex_asks }}</h1>
+      <p>{{ sorted_bitmex_asks }}</p>
+    </div>
+    <div class="col">
+      <!-- <p>{{ data }}</p> -->
     </div>
   </div>
 </template>
@@ -15,6 +18,14 @@ import axios from 'axios'
 export default {
   name: 'Data',
   computed: {
+    sorted_binance_asks: function() {
+      return
+    },
+
+    sorted_binance_bids: function() {
+      return
+    },
+    
     sorted_bitmex_asks: function() {
       let items = this.bitmex_asks.sort((a, b) => parseFloat(a.price) - parseFloat(b.price))
       return items.slice(0,5)
@@ -23,13 +34,62 @@ export default {
     sorted_bitmex_bids: function() {
       let items = this.bitmex_bids.sort((a, b) => parseFloat(b.price) - parseFloat(a.price))
       return items.slice(0,5)
+    },
+
+    sorted_okex_asks: function() {
+      return
+    },
+
+    sorted_okex_bids: function() {
+      return
+    }
+  },
+
+  created() {
+    try {
+      let ws = new WebSocket("ws://localhost:8000/ws")
+      ws.onmessage = ((e) => {
+        switch (JSON.parse(e.data)["host"]) {
+          case "binance":
+            this.binance_asks = e.data["asks"]
+            this.binance_bids = e.data["bids"]
+            break
+
+          case "bitmex":
+            switch (e.data["action"]) {
+              case "update":
+                
+                break
+
+              default:
+                break
+            }
+
+            break
+
+          case "okex":
+            this.okex_asks = e.data["data"]["asks"]
+            this.okex_bids = e.data["data"]["bids"]
+            break
+          
+          default:
+            break
+        }
+      })
+    } catch (e) {
+      console.log(e)
     }
   },
 
   data () {
     return {
+      binance_asks: [],
+      binance_bids: [],
       bitmex_asks: [],
-      bitmex_bids: []
+      bitmex_bids: [],
+      master_sorted: [],
+      okex_asks: [],
+      okex_bids: []
     }
   },
 
@@ -45,10 +105,6 @@ export default {
           return b.side == "Buy"
         })
       })
-
-      let ws = new WebSocket("ws://localhost:8000/ws")
-      
-
     } catch(e) {
       console.log(e)
     }
