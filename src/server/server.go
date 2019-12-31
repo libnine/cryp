@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 
 	stream "../stream"
@@ -16,8 +15,8 @@ import (
 )
 
 var (
+	c        = make(chan os.Signal, 1)
 	clients  = make(map[*websocket.Conn]bool)
-	done     = make(chan os.Signal, 1)
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
@@ -26,19 +25,16 @@ var (
 )
 
 // Serve ws data coming from crypto exchanges
-func Serve(wg *sync.WaitGroup) {
-	wg.Add(1)
-	defer wg.Done()
+func Serve() {
+	signal.Notify(c, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/ids", idsHandler).Methods("GET")
 	r.HandleFunc("/ws", wsHandler).Methods("GET")
 
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	go echo()
-	log.Fatal(http.ListenAndServe(":8000", handlers.CORS(handlers.AllowedOrigins([]string{"*"}))(r)))
 
-	wg.Wait()
+	log.Fatal(http.ListenAndServe(":8000", handlers.CORS(handlers.AllowedOrigins([]string{"*"}))(r)))
 }
 
 func idsHandler(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +53,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func echo() {
-	defer close(done)
+	defer close(c)
 	for {
 		select {
 		case v := <-stream.IncomingOkex:
@@ -94,7 +90,7 @@ func echo() {
 				err = json.NewEncoder(w).Encode(&v)
 			}
 
-		case <-done:
+		case <-c:
 			return
 		}
 	}

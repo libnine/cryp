@@ -12,11 +12,11 @@ var (
 )
 
 func main() {
-	wg.Add(2)
+	wg.Add(1)
 	defer wg.Done()
 
 	go stream.Stream(&wg)
-	go server.Serve(&wg)
+	go server.Serve()
 
 	wg.Wait()
 }
