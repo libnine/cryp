@@ -64,9 +64,9 @@ func echo() {
 			for client := range clients {
 				w, err := client.NextWriter(websocket.TextMessage)
 				if err != nil {
-					log.Printf("Websocket error: %s", err)
 					client.Close()
 					delete(clients, client)
+					break
 				}
 
 				err = json.NewEncoder(w).Encode(&v)
@@ -76,9 +76,9 @@ func echo() {
 			for client := range clients {
 				w, err := client.NextWriter(websocket.TextMessage)
 				if err != nil {
-					log.Printf("Websocket error: %s", err)
 					client.Close()
 					delete(clients, client)
+					break
 				}
 				err = json.NewEncoder(w).Encode(&v)
 			}
@@ -87,9 +87,9 @@ func echo() {
 			for client := range clients {
 				w, err := client.NextWriter(websocket.TextMessage)
 				if err != nil {
-					log.Printf("Websocket error: %s", err)
 					client.Close()
 					delete(clients, client)
+					break
 				}
 				err = json.NewEncoder(w).Encode(&v)
 			}

@@ -41,6 +41,10 @@ export default {
 
     sorted_okex_bids: function() {
       return
+    },
+
+    master: function() {
+          
     }
   },
 
