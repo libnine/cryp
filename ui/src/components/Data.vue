@@ -1,10 +1,7 @@
 <template>
   <div class="container">
     <div class="col">
-      <p>{{ sorted_bitmex_bids }} {{ sorted_bitmex_asks }}</p>
-    </div>
-    <div class="col">
-      <p>{{ sorted_binance_bids }} {{ sorted_binance_asks }}</p>
+      <p>{{ levelTwoAsks }}</p>
     </div>
   </div>
 </template>
@@ -15,36 +12,70 @@ import axios from 'axios'
 export default {
   name: 'Data',
   computed: {
-    sorted_binance_asks: function() {
-      let items = this.binance_asks.sort((a, b) => { return a - b })
-      return items.slice(0,5)
+    bncasksMapped: function() {
+      try {
+        let asks = this.binance_asks.map(a => {
+          return ["BNC", a[0], a[1]]
+        })
+      
+        return asks
+      } catch (e) {}
     },
 
-    sorted_binance_bids: function() {
-      let items = this.binance_asks.sort((a, b) => { return b -  a})
-      return items.slice(0,5)
+    bncbidsMapped: function() {
+      try {
+        let bids = this.binance_bids.map(b => {
+          return ["BNC", b[0], b[1]]
+        })
+
+        return bids
+      } catch (e) {}
     },
   
-    sorted_bitmex_asks: function() {
-      let items = this.bitmex_asks.sort((a, b) => parseFloat(a.price) - parseFloat(b.price))
-      return items.slice(0,5)
+    bmxasksMapped: function() {
+      try {
+        let asks = this.bitmex_asks.filter(a => { return a.side == "Sell" }).map(m => {
+          return ["BMX", m.price, m.size]
+        })
+
+        return asks
+      } catch (e) {}
     },
 
-    sorted_bitmex_bids: function() {
-      let items = this.bitmex_bids.sort((a, b) => parseFloat(b.price) - parseFloat(a.price))
-      return items.slice(0,5)
+    bmxbidsMapped: function() {
+      try {
+        let bids = this.bitmex_bids.filter(b => { return b.side == "Buy" }).map(m => {
+          return ["BMX", m.price, m.size]
+        })
+
+        return bids
+      } catch (e) {}
     },
 
-    sorted_okex_asks: function() {
+    okxasksMapped: function() {
       return
     },
 
-    sorted_okex_bids: function() {
+    okxbidsMapped: function() {
       return
     },
 
-    master: function() {
-          
+    levelTwoAsks: function() {
+      try {
+        let bmx = this.bitmex_asks.filter(a => { return a.side == "Sell" }).map(m => {
+            return ["BMX", m.price, m.size]
+        })
+        
+        let bnc = this.binance_asks.map(a => {
+            return ["BNC", a[0], a[1]]
+        })
+
+        return [...bnc, ...bmx]
+      } catch(e) {}
+    },
+
+    levelTwoBids: function() {
+
     }
   },
 
@@ -65,9 +96,9 @@ export default {
               case "update":
                 for (let i = 0; i < dump["data"].length; i++) {
                   if (dump["data"][i]["side"] == "Buy") {
-                    this.bitmex_bids[this.bitmex_bids.findIndex(n => n.id === dump["data"][i]["id"])]["size"] = dump["data"][i]["size"]
+                    this.bitmex_bids[this.bitmex_bids.findIndex(n => n.id === dump["data"][i]["id"])].size = dump["data"][i]["size"]
                   } else if (dump["data"][i]["side"] == "Sell") {
-                    this.bitmex_asks[this.bitmex_asks.findIndex(n => n.id === dump["data"][i]["id"])]["size"] = dump["data"][i]["size"]
+                    this.bitmex_asks[this.bitmex_asks.findIndex(n => n.id === dump["data"][i]["id"])].size = dump["data"][i]["size"]
                   }
                 }
                 break
@@ -118,7 +149,6 @@ export default {
       binance_bids: [],
       bitmex_asks: [],
       bitmex_bids: [],
-      master_sorted: [],
       okex_asks: [],
       okex_bids: []
     }
