@@ -50,6 +50,17 @@ func Serve(ctx context.Context) (err error) {
 	<-ctx.Done()
 	log.Printf("server stopped")
 
+	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer func() {
+		cancel()
+	}()
+
+	if err = srv.Shutdown(ctxShutdown); err != nil {
+		log.Fatalf("server shutdown failed: %+s", err)
+	}
+
+	log.Printf("server exited properly")
+
 	if err == http.ErrServerClosed {
 		err = nil
 	}
