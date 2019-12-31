@@ -1,12 +1,11 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
+	"time"
 
 	stream "../stream"
 	"github.com/gorilla/handlers"
@@ -15,8 +14,16 @@ import (
 )
 
 var (
-	c        = make(chan os.Signal, 1)
-	clients  = make(map[*websocket.Conn]bool)
+	clients = make(map[*websocket.Conn]bool)
+	handler = handlers.CORS(handlers.AllowedOrigins([]string{"*"}))(r)
+	r       = mux.NewRouter()
+	srv     = &http.Server{
+		Addr:         ":8000",
+		Handler:      handler,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  15 * time.Second,
+	}
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
@@ -25,16 +32,29 @@ var (
 )
 
 // Serve ws data coming from crypto exchanges
-func Serve() {
-	signal.Notify(c, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
-	r := mux.NewRouter()
+func Serve(ctx context.Context) (err error) {
 	r.HandleFunc("/ids", idsHandler).Methods("GET")
 	r.HandleFunc("/ws", wsHandler).Methods("GET")
 
-	go echo()
+	go func() {
+		if err = srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %+s\n", err)
+		}
+	}()
 
-	log.Fatal(http.ListenAndServe(":8000", handlers.CORS(handlers.AllowedOrigins([]string{"*"}))(r)))
+	go func() {
+		echo(ctx)
+	}()
+
+	log.Printf("server started")
+	<-ctx.Done()
+	log.Printf("server stopped")
+
+	if err == http.ErrServerClosed {
+		err = nil
+	}
+
+	return
 }
 
 func idsHandler(w http.ResponseWriter, r *http.Request) {
@@ -52,8 +72,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	clients[ws] = true
 }
 
-func echo() {
-	defer close(c)
+func echo(ctx context.Context) {
 	for {
 		select {
 		case v := <-stream.IncomingOkex:
@@ -90,7 +109,7 @@ func echo() {
 				err = json.NewEncoder(w).Encode(&v)
 			}
 
-		case <-c:
+		case <-ctx.Done():
 			return
 		}
 	}

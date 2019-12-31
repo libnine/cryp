@@ -1,22 +1,30 @@
 package main
 
 import (
-	"sync"
+	"context"
+	"log"
+	"os"
+	"os/signal"
 
 	"../../src/server"
 	"../../src/stream"
 )
 
-var (
-	wg sync.WaitGroup
-)
-
 func main() {
-	wg.Add(1)
-	defer wg.Done()
+	var (
+		c           = make(chan os.Signal, 1)
+		ctx, cancel = context.WithCancel(context.Background())
+	)
 
-	go stream.Stream(&wg)
-	go server.Serve()
+	signal.Notify(c, os.Interrupt)
 
-	wg.Wait()
+	go func() {
+		go stream.Stream(ctx)
+		<-c
+		cancel()
+	}()
+
+	if err := server.Serve(ctx); err != nil {
+		log.Printf("failed to serve: %+v\n", err)
+	}
 }

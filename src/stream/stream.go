@@ -3,12 +3,11 @@ package stream
 import (
 	"bytes"
 	"compress/flate"
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/url"
-	"os"
-	"os/signal"
 	"sync"
 	"time"
 
@@ -71,11 +70,11 @@ var (
 )
 
 // Stream for crypto data
-func Stream(wg *sync.WaitGroup) {
+func Stream(ctx context.Context) {
 	var (
-		interrupt = make(chan os.Signal, 1)
-		shutdown  = make(chan struct{})
-		urls      []url.URL
+		shutdown = make(chan struct{})
+		urls     []url.URL
+		wg       sync.WaitGroup
 	)
 
 	subs := map[string][]byte{
@@ -90,17 +89,14 @@ func Stream(wg *sync.WaitGroup) {
 		url.URL{Scheme: "wss", Host: "www.bitmex.com", Path: "realtime?subscribe=instrument"},
 		url.URL{Scheme: "wss", Host: "stream.binance.com:9443", Path: "/ws/ethusdt@depth20"})
 
-	// for graceful shutdown
-	signal.Notify(interrupt, os.Interrupt)
 	go func() {
-		<-interrupt
-		log.Println("Interrupt.")
+		<-ctx.Done()
 		close(shutdown)
 	}()
 
 	for _, u := range urls {
 		wg.Add(1)
-		go con(u, shutdown, subs[u.Host], wg)
+		go con(u, shutdown, subs[u.Host], &wg)
 	}
 
 	wg.Wait()
@@ -109,7 +105,7 @@ func Stream(wg *sync.WaitGroup) {
 func con(u url.URL, shutdown chan struct{}, sub []byte, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	log.Printf("connecting to %s", u.Host)
+	log.Printf("connecting to: %+s\n", u.Host)
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
 		log.Fatal("dial:", err)
@@ -118,8 +114,8 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, wg *sync.WaitGroup) {
 	c.WriteMessage(websocket.TextMessage, sub)
 
 	var (
-		attempts int = 0
-		done         = make(chan struct{})
+		attempts int
+		done     = make(chan struct{})
 	)
 
 	go func() {
@@ -152,7 +148,7 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, wg *sync.WaitGroup) {
 						}
 
 						if attempts >= 10 {
-							log.Fatal("Stopped bitmex after 10 attempts.")
+							log.Printf("stopped bitmex after 10 attempts\n")
 							return
 						}
 
@@ -180,7 +176,7 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, wg *sync.WaitGroup) {
 				}
 			}
 			if err != nil {
-				log.Println("err:", err)
+				log.Printf("err:+%v\n", err)
 				return
 			}
 		}
@@ -194,7 +190,7 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, wg *sync.WaitGroup) {
 		case <-shutdown:
 			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			if err != nil {
-				log.Println("write close:", err)
+				log.Printf("write close:+%v\n", err)
 				return
 			}
 			return
