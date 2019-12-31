@@ -175,8 +175,9 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, wg *sync.WaitGroup) {
 					IncomingOkex <- x
 				}
 			}
+
 			if err != nil {
-				log.Printf("err:+%v\n", err)
+				log.Printf("err: %+v\n", err)
 				return
 			}
 		}

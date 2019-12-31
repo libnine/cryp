@@ -1,6 +1,7 @@
 <template>
   <div class="container">
-    <div class="col">
+    <div class="col"
+      v-cloak>
       <p>{{ levelTwoAsks }}</p>
     </div>
   </div>
@@ -17,7 +18,7 @@ export default {
         let asks = this.binance_asks.map(a => {
           return ["BNC", a[0], a[1]]
         })
-      
+
         return asks
       } catch (e) {}
     },
@@ -71,6 +72,7 @@ export default {
         })
 
         return [...bnc, ...bmx]
+
       } catch(e) {}
     },
 
