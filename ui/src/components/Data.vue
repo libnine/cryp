@@ -2,8 +2,8 @@
   <div class="container">
     <div class="col"
       v-cloak>
-      <p>{{ asksOkex }}</p>
-      <p>{{ bidsOkex }}</p>
+      <p>{{ asksBitmex }}</p>
+      <p>{{ bidsBitmex }}</p>
     </div>
   </div>
 </template>
@@ -37,25 +37,31 @@ export default {
           case "bitmex":
             switch (dump["action"]) {
               case "update":
-                for (let i = 0; i < dump["data"].length; i++) {
+                let bmxBuy = dump["data"]
+                  .filter(b => b.side === "Buy")
+                    .map((m) => {
+                      let n = this.bidsBitmex.findIndex(o => m.id === o.id)
+                      this.bidsBitmex[n].size = m.size
+                  })
 
-                }
+                let bmxSell = dump["data"]
+                  .filter(a => a.side === "Sell")
+                    .map((m) => {
+                      let n = this.asksBitmex.findIndex(o => m.id === o.id)
+                      this.asksBitmex[n].size = m.size
+                  })
+
                 break
 
               case "delete":
-                for (let i = 0; i < dump["data"].length; i++) {
-                  if (dump["data"][i]["side"] == "Buy") {
-                    this.bidsBitmex.splice(this.bidsBitmex.findIndex(n => n.id === dump["data"][i]["id"]), 1)
-                  } else if (dump["data"][i]["side"] == "Sell") {
-                    this.bitmex_asks.splice(this.bitmex_asks.findIndex(n => n.id === dump["data"][i]["id"]), 1)
-                  }
-                }
+                
+                
                 break
 
               case "insert":
-                for (let i = 0; i < dump["data"].length; i++) {
+                // for (let i = 0; i < dump["data"].length; i++) {
                   
-                }
+                // }
                 break
 
               default:
@@ -78,6 +84,8 @@ export default {
           default:
             break
         }
+
+        
       })
     } catch (e) {
       console.log(e)
