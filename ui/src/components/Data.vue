@@ -2,7 +2,8 @@
   <div class="container">
     <div class="col"
       v-cloak>
-      <p>{{ levelTwoAsks }}</p>
+      <p>{{ asksOkex }}</p>
+      <p>{{ bidsOkex }}</p>
     </div>
   </div>
 </template>
@@ -11,74 +12,8 @@
 import axios from 'axios'
 
 export default {
-  name: 'Data',
   computed: {
-    bncasksMapped: function() {
-      try {
-        let asks = this.binance_asks.map(a => {
-          return ["BNC", a[0], a[1]]
-        })
-
-        return asks
-      } catch (e) {}
-    },
-
-    bncbidsMapped: function() {
-      try {
-        let bids = this.binance_bids.map(b => {
-          return ["BNC", b[0], b[1]]
-        })
-
-        return bids
-      } catch (e) {}
-    },
-  
-    bmxasksMapped: function() {
-      try {
-        let asks = this.bitmex_asks.filter(a => { return a.side == "Sell" }).map(m => {
-          return ["BMX", m.price, m.size]
-        })
-
-        return asks
-      } catch (e) {}
-    },
-
-    bmxbidsMapped: function() {
-      try {
-        let bids = this.bitmex_bids.filter(b => { return b.side == "Buy" }).map(m => {
-          return ["BMX", m.price, m.size]
-        })
-
-        return bids
-      } catch (e) {}
-    },
-
-    okxasksMapped: function() {
-      return
-    },
-
-    okxbidsMapped: function() {
-      return
-    },
-
-    levelTwoAsks: function() {
-      try {
-        let bmx = this.bitmex_asks.filter(a => { return a.side == "Sell" }).map(m => {
-            return ["BMX", m.price, m.size]
-        })
-        
-        let bnc = this.binance_asks.map(a => {
-            return ["BNC", a[0], a[1]]
-        })
-
-        return [...bnc, ...bmx]
-
-      } catch(e) {}
-    },
-
-    levelTwoBids: function() {
-
-    }
+    
   },
 
   created() {
@@ -89,26 +24,28 @@ export default {
 
         switch (dump["host"]) {
           case "binance":
-            this.binance_asks = dump["asks"]
-            this.binance_bids = dump["bids"]
+            this.asksBinance = dump["asks"]
+              .map((m) => { return {"exchange": "BNC", "price": m[0], "size": m[1]} })
+                .sort((a, b) => { return a.price - b.price })
+
+            this.bidsBinance = dump["bids"]
+              .map((m) => { return {"exchange": "BNC", "price": m[0], "size": m[1]} })
+                .sort((a, b) => { return b.price - a.price })
+
             break
 
           case "bitmex":
             switch (dump["action"]) {
               case "update":
                 for (let i = 0; i < dump["data"].length; i++) {
-                  if (dump["data"][i]["side"] == "Buy") {
-                    this.bitmex_bids[this.bitmex_bids.findIndex(n => n.id === dump["data"][i]["id"])].size = dump["data"][i]["size"]
-                  } else if (dump["data"][i]["side"] == "Sell") {
-                    this.bitmex_asks[this.bitmex_asks.findIndex(n => n.id === dump["data"][i]["id"])].size = dump["data"][i]["size"]
-                  }
+
                 }
                 break
 
               case "delete":
                 for (let i = 0; i < dump["data"].length; i++) {
                   if (dump["data"][i]["side"] == "Buy") {
-                    this.bitmex_bids.splice(this.bitmex_bids.findIndex(n => n.id === dump["data"][i]["id"]), 1)
+                    this.bidsBitmex.splice(this.bidsBitmex.findIndex(n => n.id === dump["data"][i]["id"]), 1)
                   } else if (dump["data"][i]["side"] == "Sell") {
                     this.bitmex_asks.splice(this.bitmex_asks.findIndex(n => n.id === dump["data"][i]["id"]), 1)
                   }
@@ -117,11 +54,7 @@ export default {
 
               case "insert":
                 for (let i = 0; i < dump["data"].length; i++) {
-                  if (dump["data"][i]["side"] == "Buy") {
-                    this.bitmex_bids.push(dump["data"][i])
-                  } else if (dump["data"][i]["side"] == "Sell") {
-                    this.bitmex_asks.push(dump["data"][i])
-                  }
+                  
                 }
                 break
 
@@ -132,8 +65,14 @@ export default {
             break
 
           case "okex":
-            this.okex_asks = dump["data"]["asks"]
-            this.okex_bids = dump["data"]["bids"]
+            this.asksOkex = dump["data"][0]["asks"]
+              .map((m) => { return {"exchange": "OKX", "price": m[0], "size": m[1]} })
+                .sort((a, b) => { return a.price - b.price })
+
+            this.bidsOkex = dump["data"][0]["bids"]
+              .map((m) => { return {"exchange": "OKX", "price": m[0], "size": m[1]} })
+                .sort((a, b) => { return b.price - a.price })
+
             break
           
           default:
@@ -147,31 +86,39 @@ export default {
 
   data () {
     return {
-      binance_asks: [],
-      binance_bids: [],
-      bitmex_asks: [],
-      bitmex_bids: [],
-      okex_asks: [],
-      okex_bids: []
+      asksBinance: [],
+      asksBitmex: [],
+      asksOkex: [],
+      bidsBinance: [],
+      bidsBitmex: [],
+      bidsOkex: []
     }
+  },
+
+  methods: {
+
   },
 
   mounted() {
     try {
       axios.get("http://localhost:8000/ids")
       .then(r => {
-        this.bitmex_asks = r.data.filter((b) => {
-          return b.side == "Sell"
-        })
+        this.asksBitmex = r.data
+          .filter(b => b.side == "Sell")
+            .map((m) => { return {"exchange": "BMX", "id": m.id, "price": m.price, "size": m.size} })
+              .sort((a, b) => { return a.price - b.price })
 
-        this.bitmex_bids = r.data.filter((b) => {
-          return b.side == "Buy"
-        })
+        this.bidsBitmex = r.data
+          .filter(b => b.side == "Buy")
+            .map((m) => { return {"exchange": "BMX", "id": m.id, "price": m.price, "size": m.size} })
+              .sort((a, b) => { return b.price - a.price })
       })
     } catch(e) {
       console.log(e)
     }
-  }
+  },
+
+  name: 'Data'
 }
 </script>
 

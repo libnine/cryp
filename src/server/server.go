@@ -92,7 +92,7 @@ func echo(ctx context.Context) {
 				if err != nil {
 					client.Close()
 					delete(clients, client)
-					break
+					continue
 				}
 
 				err = json.NewEncoder(w).Encode(&v)
@@ -104,8 +104,9 @@ func echo(ctx context.Context) {
 				if err != nil {
 					client.Close()
 					delete(clients, client)
-					break
+					continue
 				}
+
 				err = json.NewEncoder(w).Encode(&v)
 			}
 
@@ -115,12 +116,17 @@ func echo(ctx context.Context) {
 				if err != nil {
 					client.Close()
 					delete(clients, client)
-					break
+					continue
 				}
+
 				err = json.NewEncoder(w).Encode(&v)
 			}
 
 		case <-ctx.Done():
+			for client := range clients {
+				client.Close()
+			}
+
 			return
 		}
 	}

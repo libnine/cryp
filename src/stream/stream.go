@@ -185,9 +185,9 @@ func con(u url.URL, shutdown chan struct{}, sub []byte) {
 		case <-shutdown:
 			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			if err != nil {
-				log.Printf("write close:+%v\n", err)
-				return
+				log.Printf("write close: %+v\n", err)
 			}
+
 			return
 		}
 	}
