@@ -10,10 +10,12 @@
 </template>
 
 <script>
+import Data from './components/Data'
 import Header from './components/Header'
 
 export default {
   components: {
+    'levelTwo': Data,
     'hdr': Header
   },
 
