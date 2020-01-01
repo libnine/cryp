@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/url"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -74,7 +73,6 @@ func Stream(ctx context.Context) {
 	var (
 		shutdown = make(chan struct{})
 		urls     []url.URL
-		wg       sync.WaitGroup
 	)
 
 	subs := map[string][]byte{
@@ -95,21 +93,17 @@ func Stream(ctx context.Context) {
 	}()
 
 	for _, u := range urls {
-		wg.Add(1)
-		go con(u, shutdown, subs[u.Host], &wg)
+		go con(u, shutdown, subs[u.Host])
 	}
-
-	wg.Wait()
 }
 
-func con(u url.URL, shutdown chan struct{}, sub []byte, wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func con(u url.URL, shutdown chan struct{}, sub []byte) {
 	log.Printf("connecting to: %+s\n", u.Host)
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
 		log.Fatal("dial:", err)
 	}
+
 	defer c.Close()
 	c.WriteMessage(websocket.TextMessage, sub)
 
