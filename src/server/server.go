@@ -42,12 +42,14 @@ func Serve(ctx context.Context) (err error) {
 		}
 	}()
 
+	log.Printf("server started")
+
 	go func() {
 		echo(ctx)
 	}()
 
-	log.Printf("server started")
 	<-ctx.Done()
+
 	log.Printf("server stopped")
 
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -111,6 +113,18 @@ func echo(ctx context.Context) {
 			}
 
 		case v := <-stream.IncomingBitmex:
+			for client := range clients {
+				w, err := client.NextWriter(websocket.TextMessage)
+				if err != nil {
+					client.Close()
+					delete(clients, client)
+					continue
+				}
+
+				err = json.NewEncoder(w).Encode(&v)
+			}
+
+		case v := <-stream.IncomingBitstamp:
 			for client := range clients {
 				w, err := client.NextWriter(websocket.TextMessage)
 				if err != nil {

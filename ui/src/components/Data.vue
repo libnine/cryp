@@ -63,7 +63,6 @@
 
 <script>
 import axios from 'axios'
-import bus from '../main'
 
 export default {
   created() {
@@ -154,6 +153,15 @@ export default {
 
             break
 
+          case "bitstamp":
+            this.asksBitstamp = dump["data"]["asks"]
+              .map((m) => { return {"exchange": "BTS", "price": parseFloat(m[0]), "size": parseFloat(m[1])} })
+                .slice(0, 25)
+            
+            this.bidsBitstamp = dump["data"]["bids"]
+              .map((m) => { return {"exchange": "BTS", "price": parseFloat(m[0]), "size": parseFloat(m[1])} })
+                .slice(0, 25)
+
           case "okex":
             this.asksOkex = dump["data"][0]["asks"]
               .map((m) => { return {"exchange": "OKX", "price": m[0], "size": m[1]} })
@@ -167,12 +175,12 @@ export default {
             break
         }
 
-      let asks = this.asksOkex.concat(this.asksBinance, this.asksBitmex)
+      let asks = this.asksOkex.concat(this.asksBinance, this.asksBitmex, this.asksBitstamp)
       this.levelTwoAsks = asks.sort((a, b) => {
         return a.price - b.price
       }).slice(0, 15)
 
-      let bids = this.bidsOkex.concat(this.bidsBinance, this.bidsBitmex)
+      let bids = this.bidsOkex.concat(this.bidsBinance, this.bidsBitmex, this.bidsBitstamp)
       this.levelTwoBids = bids.sort((a, b) => {
         return b.price - a.price
       }).slice(0, 15)
@@ -187,9 +195,11 @@ export default {
     return {
       asksBinance: [],
       asksBitmex: [],
+      asksBitstamp: [],
       asksOkex: [],
       bidsBinance: [],
       bidsBitmex: [],
+      bidsBitstamp: [],
       bidsOkex: [],
       levelTwoAsks: [],
       levelTwoBids: [],

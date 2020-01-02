@@ -47,6 +47,20 @@ type bitmexInit struct {
 	Data        json.RawMessage `json:"data"`
 }
 
+type bitstampData struct {
+	Ts      string     `json:"timestamp"`
+	Ms      string     `json:"microtimestamp"`
+	Asks    [][]string `json:"asks"`
+	Bids    [][]string `json:"bids"`
+	Event   string     `json:"event"`
+	Channel string     `json:"channel"`
+}
+
+type bitstamp struct {
+	Host string       `json:"host,omitempty"`
+	Data bitstampData `json:"data"`
+}
+
 type okex struct {
 	Host  string   `json:"host,omitempty"`
 	Table string   `json:"table"`
@@ -62,10 +76,11 @@ type okexl2 struct {
 
 // global variables
 var (
-	BitmexTable     = bitmexInit{}
-	IncomingOkex    = make(chan okex)
-	IncomingBinance = make(chan binance)
-	IncomingBitmex  = make(chan bitmex)
+	BitmexTable      = bitmexInit{}
+	IncomingOkex     = make(chan okex)
+	IncomingBinance  = make(chan binance)
+	IncomingBitmex   = make(chan bitmex)
+	IncomingBitstamp = make(chan bitstamp)
 )
 
 // Stream for crypto data
@@ -77,15 +92,23 @@ func Stream(ctx context.Context) {
 
 	subs := map[string][]byte{
 		// "api.huobi.pro":           []byte(`{"sub": "market.btcusdt.depth.step0"}`),
-		"real.okex.com:8443":      []byte(`{"op":"subscribe", "args": ["spot/depth5:ETH-USDT"]}`),
-		"stream.binance.com:9443": []byte(`{"method": "SUBSCRIBE", "params": ["ethusdt@depth"], "id": 1}`),
-		"www.bitmex.com":          []byte(`{"op": "subscribe", "args": ["orderBookL2_25:ETHUSD"]}`)}
+		"real.okex.com:8443":      []byte(`{"op":"subscribe", "args": ["spot/depth5:BTC-USDT"]}`),
+		"stream.binance.com:9443": []byte(`{"method": "SUBSCRIBE", "params": ["btcusdt@depth"], "id": 1}`),
+		"www.bitmex.com":          []byte(`{"op": "subscribe", "args": ["orderBookL2_25:XBTUSD"]}`),
+		"ws.bitstamp.net":         []byte(`{"event": "bts:subscribe", "data": {"channel": "order_book_btcusd"}}`)}
+
+	unsubs := map[string][]byte{
+		"real.okex.com:8443":      []byte(`{"op":"unsubscribe", "args": ["spot/depth5:BTC-USDT"]}`),
+		"stream.binance.com:9443": []byte(`{"method": "UNSUBSCRIBE", "params": ["btcusdt@depth"], "id": 1}`),
+		"ws.bitstamp.net":         []byte(`{"event": "bts:unsubscribe", "data": {"channel": "order_book_btcusd"}}`),
+		"www.bitmex.com":          []byte(`{"op": "unsubscribe", "args": ["orderBookL2_25:XBTUSD"]}`)}
 
 	urls = append(urls,
 		// url.URL{Scheme: "wss", Host: "api.huobi.pro", Path: "ws"},
 		url.URL{Scheme: "wss", Host: "real.okex.com:8443", Path: "/ws/v3", RawQuery: "compress=true"},
 		url.URL{Scheme: "wss", Host: "www.bitmex.com", Path: "realtime?subscribe=instrument"},
-		url.URL{Scheme: "wss", Host: "stream.binance.com:9443", Path: "/ws/ethusdt@depth20"})
+		url.URL{Scheme: "wss", Host: "stream.binance.com:9443", Path: "/ws/btcusdt@depth20"},
+		url.URL{Scheme: "wss", Host: "ws.bitstamp.net"})
 
 	go func() {
 		<-ctx.Done()
@@ -93,12 +116,13 @@ func Stream(ctx context.Context) {
 	}()
 
 	for _, u := range urls {
-		go con(u, shutdown, subs[u.Host])
+		go con(u, shutdown, subs[u.Host], unsubs[u.Host])
 	}
 }
 
-func con(u url.URL, shutdown chan struct{}, sub []byte) {
+func con(u url.URL, shutdown chan struct{}, sub []byte, unsub []byte) {
 	log.Printf("connecting to: %+s\n", u.Host)
+
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
 		log.Fatal("dial:", err)
@@ -107,15 +131,10 @@ func con(u url.URL, shutdown chan struct{}, sub []byte) {
 	defer c.Close()
 	c.WriteMessage(websocket.TextMessage, sub)
 
-	var (
-		attempts int
-		done     = make(chan struct{})
-	)
-
 	go func() {
-		defer close(done)
 		for {
 			messageType, message, err := c.ReadMessage()
+
 			switch messageType {
 			case websocket.TextMessage:
 				switch u.Host {
@@ -134,16 +153,10 @@ func con(u url.URL, shutdown chan struct{}, sub []byte) {
 
 				case "www.bitmex.com":
 					if !BitmexTable.ready {
-						attempts++
 						_ = json.Unmarshal(message, &BitmexTable)
 
 						if len(BitmexTable.Keys) > 0 {
 							BitmexTable.ready = true
-						}
-
-						if attempts >= 10 {
-							log.Printf("stopped bitmex after 10 attempts\n")
-							return
 						}
 
 					} else {
@@ -152,6 +165,12 @@ func con(u url.URL, shutdown chan struct{}, sub []byte) {
 						x.Host = "bitmex"
 						IncomingBitmex <- x
 					}
+
+				case "ws.bitstamp.net":
+					var x bitstamp
+					_ = json.Unmarshal(message, &x)
+					x.Host = "bitstamp"
+					IncomingBitstamp <- x
 				}
 
 			case websocket.BinaryMessage:
@@ -177,18 +196,12 @@ func con(u url.URL, shutdown chan struct{}, sub []byte) {
 		}
 	}()
 
-	for {
-		select {
-		case <-done:
-			return
+	<-shutdown
 
-		case <-shutdown:
-			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-			if err != nil {
-				log.Printf("write close: %+v\n", err)
-			}
-
-			return
-		}
+	err = c.WriteMessage(websocket.TextMessage, unsub)
+	if err != nil {
+		log.Printf("write close: %+v\n", err)
 	}
+
+	return
 }
