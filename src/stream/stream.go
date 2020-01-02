@@ -125,7 +125,8 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, unsub []byte) {
 
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
-		log.Fatal("dial:", err)
+		log.Printf("%+s", err)
+		return
 	}
 
 	defer c.Close()
