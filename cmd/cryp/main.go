@@ -6,8 +6,8 @@ import (
 	"os"
 	"os/signal"
 
-	"../../src/server"
-	"../../src/stream"
+	server "./server"
+	stream "./stream"
 )
 
 func main() {
