@@ -1,19 +1,16 @@
-FROM golang:1.13.5
+FROM golang:1.13.5 AS builder
 
-RUN mkdir /cryp
+RUN mkdir /app
+ADD . /app
+WORKDIR /app
 
-ADD . /cryp
+RUN 
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ./bin/cryp/main ./cmd/cryp
 
-WORKDIR /cryp
+FROM alpine:latest AS prod
 
-RUN apk update && \
-apk add git && \
-go get -d -v ./... && \
-go install -v ./... && \
-GOOS=linux GOARCH=amd64 go build -o ./bin/main ./cmd/cryp
-
-FROM alpine
+COPY --from=builder /app .
 
 EXPOSE 8000
 
-CMD ["./bin/main"]
+CMD ["./bin/cryp/main"]
