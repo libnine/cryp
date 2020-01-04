@@ -4,7 +4,6 @@ RUN mkdir /app
 ADD . /app
 WORKDIR /app
 
-RUN 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ./bin/cryp/main ./cmd/cryp
 
 FROM alpine:latest AS prod
