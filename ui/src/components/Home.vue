@@ -23,19 +23,11 @@ export default {
 <style scoped>
 @import url('https://fonts.googleapis.com/css?family=Zeyada&display=swap');
 
-#box-text {
-  padding: 1%;
-}
-
 body {
   display: inline-block;
   margin: 0;
   font-weight: 200;
   font-size: 16px;
-}
-
-#content {
-  padding-top: 3%;
 }
 
 @keyframes appear {

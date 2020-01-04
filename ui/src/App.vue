@@ -52,7 +52,7 @@ html {
 #hdr-id {
   align-content: center;
   height: 100%;
-  margin-top: 5%;
+  margin-top: 2%;
   padding: 5px;
   width: 100%;
 }

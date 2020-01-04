@@ -1,62 +1,67 @@
 <template>
   <div class="levelTwo">
-    <div 
-      class="col"
-      v-cloak>
-        <div
-        v-for="(l, index) in levelTwoBids" 
-        :key="index">
-        <span class="exchange bids">{{ l.exchange }}</span>
-        </div>
+    <div
+    class="bids wrap">
+      <div 
+        class="col"
+        v-cloak>
+          <div
+          v-for="(l, index) in levelTwoBids" 
+          :key="index">
+          <span class="exchange bids">{{ l.exchange }}</span>
+          </div>
+      </div>
+      <div 
+        class="col"
+        v-cloak>
+          <div
+          v-for="(l, index) in levelTwoBids" 
+          :key="index">
+          <span class="price bids">{{ l.price }}</span>
+          </div>
+      </div>
+      <div 
+        class="col"
+        v-cloak>
+          <div
+          v-for="(l, index) in levelTwoBids" 
+          :key="index">
+          <span class="size bids" v-if="l.exchange === 'BMX'">{{ l.size }}</span>
+          <span class="size bids" v-else>{{ parseFloat(l.size).toFixed(3) }}</span>
+          </div>
+      </div>
+
     </div>
-    <div 
-      class="col"
-      v-cloak>
-        <div
-        v-for="(l, index) in levelTwoBids" 
-        :key="index">
-        <span class="price bids">{{ l.price }}</span>
-        </div>
-    </div>
-    <div 
-      class="col"
-      v-cloak>
-        <div
-        v-for="(l, index) in levelTwoBids" 
-        :key="index">
-        <span class="size bids" v-if="l.exchange === 'BMX'">{{ l.size }}</span>
-        <span class="size bids" v-else>{{ parseFloat(l.size).toFixed(3) }}</span>
-        </div>
-    </div>
-    <div class="col">
-    </div>
-    <div 
-      class="col"
-      v-cloak>
-        <div
-        v-for="(l, index) in levelTwoAsks" 
-        :key="index">
-        <span class="exchange asks">{{ l.exchange }}</span>
-        </div>
-    </div>
-    <div 
-      class="col"
-      v-cloak>
-        <div
-        v-for="(l, index) in levelTwoAsks" 
-        :key="index">
-        <span class="price asks">{{ l.price }}</span>
-        </div>
-    </div>
-    <div 
-      class="col"
-      v-cloak>
-        <div
-        v-for="(l, index) in levelTwoAsks" 
-        :key="index">
-        <span class="size asks" v-if="l.exchange === 'BMX'">{{ l.size }}</span>
-        <span class="size asks" v-else>{{ parseFloat(l.size).toFixed(3) }}</span>
-        </div>
+    <div
+    class="asks wrap">
+      <div 
+        class="col"
+        v-cloak>
+          <div
+          v-for="(l, index) in levelTwoAsks" 
+          :key="index">
+          <span class="exchange asks">{{ l.exchange }}</span>
+          </div>
+      </div>
+      <div 
+        class="col"
+        v-cloak>
+          <div
+          v-for="(l, index) in levelTwoAsks" 
+          :key="index">
+          <span class="price asks">{{ l.price }}</span>
+          </div>
+      </div>
+      <div 
+        class="col"
+        v-cloak>
+          <div
+          v-for="(l, index) in levelTwoAsks" 
+          :key="index">
+          <span class="size asks" v-if="l.exchange === 'BMX'">{{ l.size }}</span>
+          <span class="size asks" v-else>{{ parseFloat(l.size).toFixed(3) }}</span>
+          </div>
+      </div>
     </div>
   </div>
 </template>
@@ -178,12 +183,12 @@ export default {
       let asks = this.asksOkex.concat(this.asksBinance, this.asksBitmex, this.asksBitstamp)
       this.levelTwoAsks = asks.sort((a, b) => {
         return a.price - b.price
-      }).slice(0, 15)
+      }).slice(0, 20)
 
       let bids = this.bidsOkex.concat(this.bidsBinance, this.bidsBitmex, this.bidsBitstamp)
       this.levelTwoBids = bids.sort((a, b) => {
         return b.price - a.price
-      }).slice(0, 15)
+      }).slice(0, 20)
 
       })
     } catch (e) {
@@ -237,17 +242,30 @@ export default {
 
 .asks {
   color: red;
+  display: inline-block;
+  padding: 2%;
 }
 
 .bids {
   color: green;
+  display: inline-block;
+  padding: 2%
+}
+
+.bids-col {
+  display: inline-block;
+  margin: 0 auto;
+  text-align: center;
+	transform: rotate(270deg);
+	transform-origin: right bottom 0;
+  width: 25px;
 }
 
 .col {
   display: inline-block;
-  margin: 0px;
+  margin: 0 25px;
   text-align: left;
-  width: 6%;
+  width: 25px;
 }
 
 .exchange {
@@ -256,11 +274,11 @@ export default {
   text-align: left;
 }
 
-.leveltwo {
+.levelTwo {
   display: inline-block;
   margin: 0px;
   text-align: center;
-  padding-top: 3%;
+  padding-top: 1%;
   width: 75%;
 }
 
@@ -272,9 +290,12 @@ export default {
   text-align: left;
 }
 
+.wrap {
+  border: dashed 1px;
+}
+
 @keyframes appear {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-
 </style>
