@@ -8,10 +8,6 @@ import (
 
 	"../../src/server"
 	"../../src/stream"
-
-	_ "github.com/gorilla/handlers"
-	_ "github.com/gorilla/mux"
-	_ "github.com/gorilla/websocket"
 )
 
 func main() {
