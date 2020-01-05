@@ -6,8 +6,7 @@ import (
 	"os"
 	"os/signal"
 
-	server "./server"
-	stream "./stream"
+	"github.com/libnine/cryp/cryp"
 )
 
 func main() {
