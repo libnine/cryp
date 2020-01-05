@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/libnine/cryp/cryp"
+	"github.com/libnine/cryp/internal/pkg/cryp"
 )
 
 func main() {
