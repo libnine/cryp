@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/signal"
 
-	btc "github.com/libnine/cryp/internal/pkg/cryp"
+	btc "github.com/libnine/cryp/internal/exchange/"
 )
 
 func main() {

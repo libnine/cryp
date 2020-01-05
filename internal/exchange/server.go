@@ -1,4 +1,4 @@
-package cryp
+package exchange
 
 import (
 	"context"
