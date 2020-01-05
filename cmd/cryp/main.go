@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/libnine/cryp/internal/pkg/cryp"
+	btc "github.com/libnine/cryp/internal/pkg/cryp"
 )
 
 func main() {
@@ -18,12 +18,12 @@ func main() {
 	signal.Notify(c, os.Interrupt)
 
 	go func() {
-		go Feed(ctx)
+		go btc.Feed(ctx)
 		<-c
 		cancel()
 	}()
 
-	if err := Serve(ctx); err != nil {
+	if err := btc.Serve(ctx); err != nil {
 		log.Printf("failed to serve: %+v\n", err)
 	}
 }
