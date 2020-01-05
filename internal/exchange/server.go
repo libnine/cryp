@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	stream "../stream"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -75,7 +74,7 @@ func Serve(ctx context.Context) (err error) {
 func idsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(stream.BitmexTable.Data)
+	json.NewEncoder(w).Encode(BitmexTable.Data)
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +89,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 func echo(ctx context.Context) {
 	for {
 		select {
-		case v := <-stream.IncomingOkex:
+		case v := <-IncomingOkex:
 			for client := range clients {
 				w, err := client.NextWriter(websocket.TextMessage)
 				if err != nil {
@@ -102,7 +101,7 @@ func echo(ctx context.Context) {
 				err = json.NewEncoder(w).Encode(&v)
 			}
 
-		case v := <-stream.IncomingBinance:
+		case v := <-IncomingBinance:
 			for client := range clients {
 				w, err := client.NextWriter(websocket.TextMessage)
 				if err != nil {
@@ -114,7 +113,7 @@ func echo(ctx context.Context) {
 				err = json.NewEncoder(w).Encode(&v)
 			}
 
-		case v := <-stream.IncomingBitmex:
+		case v := <-IncomingBitmex:
 			for client := range clients {
 				w, err := client.NextWriter(websocket.TextMessage)
 				if err != nil {
@@ -126,7 +125,7 @@ func echo(ctx context.Context) {
 				err = json.NewEncoder(w).Encode(&v)
 			}
 
-		case v := <-stream.IncomingBitstamp:
+		case v := <-IncomingBitstamp:
 			for client := range clients {
 				w, err := client.NextWriter(websocket.TextMessage)
 				if err != nil {

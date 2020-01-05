@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/signal"
 
-	btc "github.com/libnine/cryp/internal/exchange/"
+	exch "github.com/libnine/cryp/internal/exchange"
 )
 
 func main() {
@@ -18,12 +18,12 @@ func main() {
 	signal.Notify(c, os.Interrupt)
 
 	go func() {
-		go btc.Feed(ctx)
+		go exch.Feed(ctx)
 		<-c
 		cancel()
 	}()
 
-	if err := btc.Serve(ctx); err != nil {
+	if err := exch.Serve(ctx); err != nil {
 		log.Printf("failed to serve: %+v\n", err)
 	}
 }
