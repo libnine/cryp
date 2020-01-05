@@ -1,4 +1,4 @@
-package stream
+package cryp
 
 import (
 	"bytes"
@@ -83,8 +83,8 @@ var (
 	IncomingBitstamp = make(chan bitstamp)
 )
 
-// Stream for crypto data
-func Stream(ctx context.Context) {
+// Feed for crypto data
+func Feed(ctx context.Context) {
 	var (
 		shutdown = make(chan struct{})
 		urls     []url.URL

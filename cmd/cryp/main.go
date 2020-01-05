@@ -18,12 +18,12 @@ func main() {
 	signal.Notify(c, os.Interrupt)
 
 	go func() {
-		go stream.Stream(ctx)
+		go Feed(ctx)
 		<-c
 		cancel()
 	}()
 
-	if err := server.Serve(ctx); err != nil {
+	if err := Serve(ctx); err != nil {
 		log.Printf("failed to serve: %+v\n", err)
 	}
 }
