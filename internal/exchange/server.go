@@ -23,6 +23,7 @@ var (
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  15 * time.Second,
 	}
+	staticDir = "./ui/dist/static"
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
@@ -36,6 +37,8 @@ var (
 func Serve(ctx context.Context) (err error) {
 	r.HandleFunc("/ids", idsHandler).Methods("GET")
 	r.HandleFunc("/ws", wsHandler).Methods("GET")
+	r.PathPrefix("/static").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
+	r.PathPrefix("/").HandlerFunc(indexHandler)
 
 	go func() {
 		if err = srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -75,6 +78,10 @@ func idsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(BitmexTable.Data)
+}
+
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "./ui/dist/index.html")
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
