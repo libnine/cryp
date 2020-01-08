@@ -3,6 +3,7 @@ package exchange
 import (
 	"bytes"
 	"compress/flate"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"io/ioutil"
@@ -61,6 +62,23 @@ type bitstamp struct {
 	Data bitstampData `json:"data"`
 }
 
+type huobi struct {
+	Host string    `json:"host,omitempty"`
+	Ch   string    `json:"ch"`
+	Ts   int       `json:"ts"`
+	Tick huobiTick `json:"tick"`
+}
+
+type huobiTick struct {
+	Mrid    int             `json:"mrid"`
+	ID      int             `json:"id"`
+	Bids    [][]json.Number `json:"bids"`
+	Asks    [][]json.Number `json:"asks"`
+	Ts      int             `json:"ts"`
+	Version int             `json:"version"`
+	Ch      string          `json:"ch"`
+}
+
 type okex struct {
 	Host  string   `json:"host,omitempty"`
 	Table string   `json:"table"`
@@ -77,10 +95,11 @@ type okexl2 struct {
 // global variables
 var (
 	BitmexTable      = bitmexInit{}
-	IncomingOkex     = make(chan okex)
 	IncomingBinance  = make(chan binance)
 	IncomingBitmex   = make(chan bitmex)
 	IncomingBitstamp = make(chan bitstamp)
+	IncomingHuobi    = make(chan huobi)
+	IncomingOkex     = make(chan okex)
 )
 
 // Feed for crypto data
@@ -91,23 +110,24 @@ func Feed(ctx context.Context) {
 	)
 
 	subs := map[string][]byte{
-		// "api.huobi.pro":           []byte(`{"sub": "market.btcusdt.depth.step0"}`),
-		"real.okex.com:8443":      []byte(`{"op":"subscribe", "args": ["spot/depth5:BTC-USDT"]}`),
-		"stream.binance.com:9443": []byte(`{"method": "SUBSCRIBE", "params": ["btcusdt@depth"], "id": 1}`),
-		"www.bitmex.com":          []byte(`{"op": "subscribe", "args": ["orderBookL2_25:XBTUSD"]}`),
-		"ws.bitstamp.net":         []byte(`{"event": "bts:subscribe", "data": {"channel": "order_book_btcusd"}}`)}
+		"www.hbdm.com":       []byte(`{"sub": "market.BTC_CW.depth.step0", "id": "id9"}`),
+		"real.okex.com:8443": []byte(`{"op":"subscribe", "args": ["swap/depth5:BTC-USD-SWAP"]}`),
+		// "stream.binance.com:9443": []byte(`{"method": "SUBSCRIBE", "params": ["btcusdt@depth"], "id": 1}`),
+		"www.bitmex.com":  []byte(`{"op": "subscribe", "args": ["orderBookL2_25:XBTUSD"]}`),
+		"ws.bitstamp.net": []byte(`{"event": "bts:subscribe", "data": {"channel": "order_book_btcusd"}}`)}
 
 	unsubs := map[string][]byte{
-		"real.okex.com:8443":      []byte(`{"op":"unsubscribe", "args": ["spot/depth5:BTC-USDT"]}`),
-		"stream.binance.com:9443": []byte(`{"method": "UNSUBSCRIBE", "params": ["btcusdt@depth"], "id": 1}`),
-		"ws.bitstamp.net":         []byte(`{"event": "bts:unsubscribe", "data": {"channel": "order_book_btcusd"}}`),
-		"www.bitmex.com":          []byte(`{"op": "unsubscribe", "args": ["orderBookL2_25:XBTUSD"]}`)}
+		"www.hbdm.com":       []byte(`{"sub": "market.BTC_CW.depth.step0"}`),
+		"real.okex.com:8443": []byte(`{"op":"unsubscribe", "args": ["swap/depth5:BTC-USD-SWAP"]}`),
+		// "stream.binance.com:9443": []byte(`{"method": "UNSUBSCRIBE", "params": ["btcusdt@depth"], "id": 1}`),
+		"ws.bitstamp.net": []byte(`{"event": "bts:unsubscribe", "data": {"channel": "order_book_btcusd"}}`),
+		"www.bitmex.com":  []byte(`{"op": "unsubscribe", "args": ["orderBookL2_25:XBTUSD"]}`)}
 
 	urls = append(urls,
-		// url.URL{Scheme: "wss", Host: "api.huobi.pro", Path: "ws"},
+		url.URL{Scheme: "wss", Host: "www.hbdm.com", Path: "ws"},
 		url.URL{Scheme: "wss", Host: "real.okex.com:8443", Path: "/ws/v3", RawQuery: "compress=true"},
 		url.URL{Scheme: "wss", Host: "www.bitmex.com", Path: "realtime?subscribe=instrument"},
-		url.URL{Scheme: "wss", Host: "stream.binance.com:9443", Path: "/ws/btcusdt@depth20"},
+		// url.URL{Scheme: "wss", Host: "stream.binance.com:9443", Path: "/ws/btcusdt@depth20"},
 		url.URL{Scheme: "wss", Host: "ws.bitstamp.net"})
 
 	go func() {
@@ -139,18 +159,12 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, unsub []byte) {
 			switch messageType {
 			case websocket.TextMessage:
 				switch u.Host {
-
-				case "real.okex.com:8443":
-					var x okex
-					_ = json.Unmarshal(message, &x)
-					x.Host = "okex"
-					IncomingOkex <- x
-
 				case "stream.binance.com:9443":
 					var x binance
 					_ = json.Unmarshal(message, &x)
 					x.Host = "binance"
 					IncomingBinance <- x
+					break
 
 				case "www.bitmex.com":
 					if !BitmexTable.ready {
@@ -158,6 +172,7 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, unsub []byte) {
 
 						if len(BitmexTable.Keys) > 0 {
 							BitmexTable.ready = true
+							break
 						}
 
 					} else {
@@ -165,6 +180,7 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, unsub []byte) {
 						_ = json.Unmarshal(message, &x)
 						x.Host = "bitmex"
 						IncomingBitmex <- x
+						break
 					}
 
 				case "ws.bitstamp.net":
@@ -172,26 +188,42 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, unsub []byte) {
 					_ = json.Unmarshal(message, &x)
 					x.Host = "bitstamp"
 					IncomingBitstamp <- x
+					break
 				}
 
 			case websocket.BinaryMessage:
-				reader := flate.NewReader(bytes.NewReader(message))
-				defer reader.Close()
-				text, err := ioutil.ReadAll(reader)
-				if err != nil {
-					log.Printf("err: %s %s", u.Host, err)
-				}
+				switch u.Host {
+				case "www.hbdm.com":
+					reader, _ := gzip.NewReader(bytes.NewReader(message))
+					text, err := ioutil.ReadAll(reader)
+					if err != nil {
+						log.Printf("err: %s %s", u.Host, err)
+					}
 
-				if u.Host == "real.okex.com:8443" {
+					var x huobi
+					_ = json.Unmarshal(text, &x)
+					x.Host = "huobi"
+					IncomingHuobi <- x
+					break
+
+				case "real.okex.com:8443":
+					reader := flate.NewReader(bytes.NewReader(message))
+					defer reader.Close()
+					text, err := ioutil.ReadAll(reader)
+					if err != nil {
+						log.Printf("err: %s %s", u.Host, err)
+					}
+
 					var x okex
 					_ = json.Unmarshal(text, &x)
 					x.Host = "okex"
 					IncomingOkex <- x
+					break
 				}
 			}
 
 			if err != nil {
-				log.Printf("err: %+v\n", err)
+				log.Printf("err: %s %+v\n", u.Host, err)
 				return
 			}
 		}

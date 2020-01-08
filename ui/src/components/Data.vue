@@ -27,7 +27,7 @@
           v-for="(l, index) in levelTwoBids" 
           :key="index">
           <span class="size bids" v-if="l.exchange === 'BMX'">{{ l.size }}</span>
-          <span class="size bids" v-else>{{ parseFloat(l.size).toFixed(3) }}</span>
+          <span class="size bids" v-else>{{ l.size }}</span>
           </div>
       </div>
 
@@ -59,7 +59,7 @@
           v-for="(l, index) in levelTwoAsks" 
           :key="index">
           <span class="size asks" v-if="l.exchange === 'BMX'">{{ l.size }}</span>
-          <span class="size asks" v-else>{{ parseFloat(l.size).toFixed(3) }}</span>
+          <span class="size asks" v-else>{{ l.size }}</span>
           </div>
       </div>
     </div>
@@ -79,10 +79,10 @@ export default {
         switch (dump["host"]) {
           case "binance":
             this.asksBinance = dump["asks"]
-              .map((m) => { return {"exchange": "BNC", "price": m[0], "size": m[1]} })
+              .map((m) => { return {"exchange": "BNC", "price": parseFloat(m[0]).toFixed(1), "size": m[1]} })
 
             this.bidsBinance = dump["bids"]
-              .map((m) => { return {"exchange": "BNC", "price": m[0], "size": m[1]} })
+              .map((m) => { return {"exchange": "BNC", "price": parseFloat(m[0]).toFixed(1), "size": m[1]} })
 
             break
 
@@ -135,6 +135,8 @@ export default {
                       this.bidsBitmex.push({"exchange": "BMX", "id": m.id, "price": m.price, "size": m.size})
                   })
 
+                break
+
               case "update":
                 let bmxSell = dump["data"]
                   .filter(a => a.side === "Sell")
@@ -160,19 +162,26 @@ export default {
 
           case "bitstamp":
             this.asksBitstamp = dump["data"]["asks"]
-              .map((m) => { return {"exchange": "BTS", "price": parseFloat(m[0]), "size": parseFloat(m[1])} })
-                .slice(0, 25)
-            
+              .map((m) => { return {"exchange": "BTS", "price": parseFloat(m[0]).toFixed(1), "size": parseInt(parseFloat(m[1]) * parseFloat(m[0]))}})
+
             this.bidsBitstamp = dump["data"]["bids"]
-              .map((m) => { return {"exchange": "BTS", "price": parseFloat(m[0]), "size": parseFloat(m[1])} })
-                .slice(0, 25)
+              .map((m) => { return {"exchange": "BTS", "price": parseFloat(m[0]).toFixed(1), "size": parseInt(parseFloat(m[1]) * parseFloat(m[0]))}})
+
+            break
+
+          case "huobi":
+            this.asksHuobi = dump["tick"]["asks"]
+              .map((m) => { return {"exchange": "HBI", "price": parseFloat(m[0]).toFixed(1), "size": parseInt(parseFloat(m[1]) * parseFloat(m[0]))}})
+
+            this.bidsHuobi = dump["tick"]["bids"]
+              .map((m) => { return {"exchange": "HBI", "price": parseFloat(m[0]).toFixed(1), "size": parseInt(parseFloat(m[1]) * parseFloat(m[0]))}})
 
           case "okex":
             this.asksOkex = dump["data"][0]["asks"]
-              .map((m) => { return {"exchange": "OKX", "price": m[0], "size": m[1]} })
+              .map((m) => { return {"exchange": "OKX", "price": parseFloat(m[0]).toFixed(1), "size": parseInt(m[1] * 100)}})
 
             this.bidsOkex = dump["data"][0]["bids"]
-              .map((m) => { return {"exchange": "OKX", "price": m[0], "size": m[1]} })
+              .map((m) => { return {"exchange": "OKX", "price": parseFloat(m[0]).toFixed(1), "size": parseInt(m[1] * 100)}})
 
             break
           
@@ -180,12 +189,12 @@ export default {
             break
         }
 
-      let asks = this.asksOkex.concat(this.asksBinance, this.asksBitmex, this.asksBitstamp)
+      let asks = this.asksOkex.concat(this.asksBinance, this.asksBitmex, this.asksBitstamp, this.asksHuobi)
       this.levelTwoAsks = asks.sort((a, b) => {
         return a.price - b.price
       }).slice(0, 20)
 
-      let bids = this.bidsOkex.concat(this.bidsBinance, this.bidsBitmex, this.bidsBitstamp)
+      let bids = this.bidsOkex.concat(this.bidsBinance, this.bidsBitmex, this.bidsBitstamp, this.bidsHuobi)
       this.levelTwoBids = bids.sort((a, b) => {
         return b.price - a.price
       }).slice(0, 20)
@@ -201,10 +210,12 @@ export default {
       asksBinance: [],
       asksBitmex: [],
       asksBitstamp: [],
+      asksHuobi: [],
       asksOkex: [],
       bidsBinance: [],
       bidsBitmex: [],
       bidsBitstamp: [],
+      bidsHuobi: [],
       bidsOkex: [],
       levelTwoAsks: [],
       levelTwoBids: [],
@@ -216,14 +227,14 @@ export default {
     try {
       axios.get("http://localhost:8000/ids")
       .then(r => {
-        this.asksBitmex = r.data
+        this.asksBitmex = JSON.parse(r.data)
           .filter(b => b.side == "Sell")
-            .map((m) => { return {"exchange": "BMX", "id": m.id, "price": m.price, "size": m.size} })
+            .map((m) => { return {"exchange": "BMX", "id": m.id, "price": parseFloat(m.price).toFixed(1), "size": m.size}})
               .sort((a, b) => { return a.price - b.price })
 
-        this.bidsBitmex = r.data
+        this.bidsBitmex = JSON.parse(r.data)
           .filter(b => b.side == "Buy")
-            .map((m) => { return {"exchange": "BMX", "id": m.id, "price": m.price, "size": m.size} })
+            .map((m) => { return {"exchange": "BMX", "id": m.id, "price": parseFloat(m.price).toFixed(1), "size": m.size} })
               .sort((a, b) => { return b.price - a.price })
 
         this.symbol = r.data[0].symbol
@@ -252,20 +263,11 @@ export default {
   padding: 2%
 }
 
-.bids-col {
-  display: inline-block;
-  margin: 0 auto;
-  text-align: center;
-	transform: rotate(270deg);
-	transform-origin: right bottom 0;
-  width: 25px;
-}
-
 .col {
   display: inline-block;
   margin: 0 25px;
   text-align: left;
-  width: 25px;
+  width: 35px;
 }
 
 .exchange {

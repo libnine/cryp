@@ -3,6 +3,7 @@ package exchange
 import (
 	"context"
 	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
@@ -24,7 +25,7 @@ var (
 		IdleTimeout:  15 * time.Second,
 	}
 	staticDir = "./ui/dist/static"
-	upgrader = websocket.Upgrader{
+	upgrader  = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
 		},
@@ -75,9 +76,17 @@ func Serve(ctx context.Context) (err error) {
 }
 
 func idsHandler(w http.ResponseWriter, r *http.Request) {
+	req, err := http.Get("https://www.bitmex.com/api/v1/orderBook/L2?symbol=XBTUSD&depth=25")
+	if err != nil {
+		log.Printf("bitmex api %+s", err)
+	}
+
+	defer req.Body.Close()
+	body, _ := ioutil.ReadAll(req.Body)
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(BitmexTable.Data)
+	json.NewEncoder(w).Encode(string(body))
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -133,6 +142,18 @@ func echo(ctx context.Context) {
 			}
 
 		case v := <-IncomingBitstamp:
+			for client := range clients {
+				w, err := client.NextWriter(websocket.TextMessage)
+				if err != nil {
+					client.Close()
+					delete(clients, client)
+					continue
+				}
+
+				err = json.NewEncoder(w).Encode(&v)
+			}
+
+		case v := <-IncomingHuobi:
 			for client := range clients {
 				w, err := client.NextWriter(websocket.TextMessage)
 				if err != nil {
