@@ -63,10 +63,11 @@ type bitstamp struct {
 }
 
 type huobi struct {
+	Ping int       `json:"ping,omitempty"`
 	Host string    `json:"host,omitempty"`
-	Ch   string    `json:"ch"`
-	Ts   int       `json:"ts"`
-	Tick huobiTick `json:"tick"`
+	Ch   string    `json:"ch,omitempty"`
+	Ts   int       `json:"ts,omitempty"`
+	Tick huobiTick `json:"tick,omitempty"`
 }
 
 type huobiTick struct {
@@ -90,6 +91,10 @@ type okexl2 struct {
 	Bids [][]json.Number `json:"bids"`
 	Inst string          `json:"instrument_id"`
 	Ts   *time.Time      `json:"timestamp"`
+}
+
+type pong struct {
+	Pong int `json:"pong"`
 }
 
 // global variables
@@ -202,6 +207,13 @@ func con(u url.URL, shutdown chan struct{}, sub []byte, unsub []byte) {
 
 					var x huobi
 					_ = json.Unmarshal(text, &x)
+
+					if x.Ping > 0 {
+						p, _ := json.Marshal(pong{Pong: x.Ping})
+						c.WriteMessage(messageType, p)
+						break
+					}
+
 					x.Host = "huobi"
 					IncomingHuobi <- x
 					break
